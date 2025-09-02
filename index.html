@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dictation App</title>
+    <link rel="stylesheet" href="/index.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script type="importmap">
+      {
+        "imports": {
+          "@google/genai": "https://esm.sh/@google/genai@^0.8.0",
+          "marked": "https://esm.sh/marked@^4.0.0"
+        }
+      }
+    </script>
+    <script async defer src="https://apis.google.com/js/api.js"></script>
+    <script async defer src="https://accounts.google.com/gsi/client"></script>
+  </head>
+  <body>
+    <div id="login-view">
+        <div class="login-box">
+            <h1 class="login-title">Voice Notes</h1>
+            <p class="login-subtitle">Your AI-powered dictation assistant.</p>
+            <button id="signInButton" class="auth-button sign-in">
+                <i class="fab fa-google"></i>
+                <span>Sign in with Google</span>
+            </button>
+        </div>
+    </div>
+
+    <div id="app-view" class="hidden">
+      <div id="note-library-view">
+          <div class="library-header">
+              <h1 class="library-title">My Voice Notes</h1>
+              <div class="header-controls">
+                  <div id="userStatus" class="user-status">
+                      <span id="userName"></span>
+                      <button id="signOutButton" class="auth-button sign-out" title="Sign Out">
+                          <i class="fas fa-sign-out-alt"></i>
+                      </button>
+                  </div>
+                  <button id="newNoteFromLibraryButton" class="action-button primary" title="Create New Note">
+                      <i class="fas fa-plus"></i> &nbsp; New Note
+                  </button>
+              </div>
+          </div>
+          <div id="notes-list-container" class="notes-list-container">
+              <div id="notes-list-spinner" class="spinner"></div>
+              <div id="notes-list" class="notes-list"></div>
+              <p id="empty-library-message" class="empty-message hidden">
+                Your library is empty. <br>Click "New Note" to start.
+              </p>
+          </div>
+      </div>
+
+      <div id="note-editor-view" class="hidden">
+        <div class="app-container">
+          <div class="main-content">
+            <div class="note-area">
+              <div class="note-header">
+                <button id="backToLibraryButton" class="action-button back-button" title="Back to Notes">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <div class="editor-title" contenteditable="true" placeholder="Untitled Note">
+                  Untitled Note
+                </div>
+                <div class="header-controls">
+                  <div class="tab-navigation-container">
+                    <div class="tab-navigation">
+                      <button class="tab-button active" data-tab="note">Polished</button>
+                      <button class="tab-button" data-tab="raw">Raw</button>
+                      <div class="active-tab-indicator"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="talking-points-container">
+                <textarea id="talkingPoints" class="talking-points-textarea" placeholder="Jot down some talking points before you record..." rows="3"></textarea>
+              </div>
+
+              <div class="note-content-wrapper">
+                <div
+                  id="polishedNote"
+                  class="note-content active"
+                  contenteditable="true"
+                  placeholder="Your polished notes will appear here..."
+                ></div>
+                <div
+                  id="rawTranscription"
+                  class="note-content"
+                  contenteditable="true"
+                  placeholder="Raw transcription will appear here..."
+                ></div>
+              </div>
+            </div>
+
+            <div class="recording-interface">
+              <div id="liveRecordingTitle" class="live-recording-title" style="display: none">
+                Recording
+              </div>
+              <canvas id="liveWaveformCanvas" style="display: none"></canvas>
+              <div id="liveRecordingTimerDisplay" class="live-recording-timer" style="display: none">
+                00:00.00
+              </div>
+
+              <div class="status-indicator">
+                <span id="recordingStatus" class="status-text">Ready to record</span>
+              </div>
+
+              <div class="recording-controls">
+                <div class="control-group left">
+                  <button class="action-button" id="themeToggleButton" title="Toggle Theme">
+                    <i class="fas fa-sun"></i>
+                  </button>
+                  <button class="action-button" id="newButton" title="New Note / Clear">
+                    <i class="fas fa-file"></i>
+                  </button>
+                </div>
+                
+                <button id="recordButton" class="record-button" title="Start/Stop Recording">
+                  <div class="record-button-inner">
+                    <i class="fas fa-microphone"></i>
+                  </div>
+                  <svg class="record-waves" viewBox="0 0 200 200">
+                    <circle class="wave wave1" cx="100" cy="100" r="40" />
+                    <circle class="wave wave2" cx="100" cy="100" r="70" />
+                    <circle class="wave wave3" cx="100" cy="100" r="100" />
+                  </svg>
+                  <span class="record-text">Record</span>
+                </button>
+
+                <div class="control-group right">
+                  <button class="action-button" id="playButton" title="Play Recording" disabled>
+                    <i class="fas fa-play"></i>
+                  </button>
+                  <button class="action-button" id="saveButton" title="Save to Google Drive" disabled>
+                    <i class="fab fa-google-drive"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div id="delete-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <h2>Delete Note</h2>
+            <p>Are you sure you want to permanently delete this note and its audio recording from your Google Drive?</p>
+            <div class="modal-actions">
+                <button id="cancel-delete" class="action-button">Cancel</button>
+                <button id="confirm-delete" class="action-button danger">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="micStatus" class="debug-panel"></div>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        const tabNav = document.querySelector(".tab-navigation");
+        if (!tabNav) return;
+        const tabButtons = tabNav.querySelectorAll(".tab-button");
+        const activeTabIndicator = tabNav.querySelector(".active-tab-indicator");
+        const noteContents = document.querySelectorAll(".note-content");
+
+        function setActiveTab(activeButton, skipAnimation = false) {
+          if (!activeButton || !activeTabIndicator) return;
+
+          tabButtons.forEach((btn) => btn.classList.remove("active"));
+          activeButton.classList.add("active");
+
+          const tabName = activeButton.getAttribute("data-tab");
+          noteContents.forEach((content) => content.classList.remove("active"));
+
+          if (tabName === "raw") {
+            document.getElementById("rawTranscription").classList.add("active");
+          } else {
+            document.getElementById("polishedNote").classList.add("active");
+          }
+
+          const originalTransition = activeTabIndicator.style.transition;
+          if (skipAnimation) {
+            activeTabIndicator.style.transition = "none";
+          } else {
+            activeTabIndicator.style.transition = "";
+          }
+
+          activeTabIndicator.style.left = `${activeButton.offsetLeft}px`;
+          activeTabIndicator.style.width = `${activeButton.offsetWidth}px`;
+
+          if (skipAnimation) {
+            activeTabIndicator.offsetHeight;
+            activeTabIndicator.style.transition = originalTransition;
+          }
+        }
+
+        tabButtons.forEach((button) => {
+          button.addEventListener("click", (e) => {
+            setActiveTab(e.currentTarget);
+          });
+        });
+
+        const initiallyActiveButton = tabNav.querySelector(".tab-button.active");
+        if (initiallyActiveButton) {
+          requestAnimationFrame(() => {
+            setActiveTab(initiallyActiveButton, true);
+          });
+        }
+
+        window.addEventListener("resize", () => {
+          requestAnimationFrame(() => {
+            const currentActiveButton = tabNav.querySelector(".tab-button.active");
+            if (currentActiveButton) {
+              setActiveTab(currentActiveButton, true);
+            }
+          });
+        });
+      });
+    </script>
+  </body>
+</html>
